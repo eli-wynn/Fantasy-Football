@@ -1,0 +1,21 @@
+# Virtual environment
+.venv/
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Model artifacts
+backend/models/artifacts/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store
+Thumbs.db
