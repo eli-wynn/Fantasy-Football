@@ -1,6 +1,8 @@
+from backend.db import engine
+from sqlalchemy import text
 import nfl_data_py as nfl
 
-rosters = nfl.import_seasonal_rosters([2024])
-print("Columns:", rosters.columns.tolist())
-print("\nSample row:")
-print(rosters.iloc[0].to_dict())
+# Check what nfl_data_py weekly data has for headshots
+df = nfl.import_weekly_data([2024])
+sample = df[df['player_display_name'].str.contains('Mahomes', na=False)][['player_id', 'player_display_name', 'headshot_url']].head(3)
+print(sample)

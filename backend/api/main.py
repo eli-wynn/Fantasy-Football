@@ -40,11 +40,17 @@ def cached(key: str):
 
 
 def clean(row: dict) -> dict:
-    """Replace float NaN/Inf with None so JSON serialization never fails."""
-    return {
-        k: (None if isinstance(v, float) and not math.isfinite(v) else v)
-        for k, v in row.items()
-    }
+    """Sanitise a DB row for JSON serialization."""
+    from decimal import Decimal
+    result = {}
+    for k, v in row.items():
+        if isinstance(v, float) and not math.isfinite(v):
+            result[k] = None
+        elif isinstance(v, Decimal):
+            result[k] = float(v)
+        else:
+            result[k] = v
+    return result
 
 
 def set_cache(key: str, data):
@@ -83,13 +89,29 @@ def get_projections(
     }.get(scoring, "projected_pts_ppr")
 
     stmt = text(f"""
-        SELECT player_id, player_name, position, team, season,
-               projected_pts_ppr, projected_pts_std, projected_pts_half,
-               confidence_low, confidence_high,
-               vorp_ppr, vorp_std, adp, adp_value_ppr
-        FROM projections
-        WHERE season = :season
-        {"AND position = :pos" if position else ""}
+        SELECT
+            p.player_id, p.player_name, p.position, p.team, p.season,
+            p.projected_pts_ppr, p.projected_pts_std, p.projected_pts_half,
+            p.confidence_low, p.confidence_high,
+            p.vorp_ppr, p.vorp_std, p.adp, p.adp_value_ppr,
+            pl.headshot_url,
+            pl.age,
+            ROUND(CAST(
+                AVG(CASE WHEN ws.fantasy_points_ppr > 0 THEN ws.fantasy_points_ppr END)
+            AS NUMERIC), 2) AS ppg_last_season
+        FROM projections p
+        LEFT JOIN players pl ON p.player_id = pl.player_id
+        LEFT JOIN weekly_stats ws
+            ON p.player_id = ws.player_id
+            AND ws.season = :season - 1
+            AND ws.fantasy_points_ppr > 0
+        WHERE p.season = :season
+        {"AND p.position = :pos" if position else ""}
+        GROUP BY p.player_id, p.player_name, p.position, p.team, p.season,
+                 p.projected_pts_ppr, p.projected_pts_std, p.projected_pts_half,
+                 p.confidence_low, p.confidence_high,
+                 p.vorp_ppr, p.vorp_std, p.adp, p.adp_value_ppr,
+                 pl.headshot_url, pl.age
         ORDER BY {sort_col} DESC
         LIMIT :limit
     """)

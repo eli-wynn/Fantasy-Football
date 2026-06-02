@@ -9,20 +9,18 @@ def fetch_sleeper_adp():
     data = response.json()
     print(f"Total players returned: {len(data)}")
 
-    adp_by_gsis = {}   # gsis_id -> rank
-    adp_by_name = {}   # "firstname lastname" lowercase -> rank
+    adp_by_gsis = {}  # gsis_id -> rank
+    adp_by_name = {}  # normalised name -> rank
 
     for player in data.values():
         search_rank = player.get("search_rank")
         if not search_rank or search_rank >= 9999999:
             continue
 
-        # Primary match: gsis_id
         gsis_id = player.get("gsis_id")
         if gsis_id:
             adp_by_gsis[gsis_id.strip()] = search_rank
 
-        # Fallback match: full name normalised (lowercase, no apostrophes/periods)
         full_name = player.get("full_name")
         if full_name:
             normalised = full_name.strip().lower().replace("'", "").replace(".", "")
@@ -30,6 +28,7 @@ def fetch_sleeper_adp():
 
     print(f"Players with valid ADP: {len(adp_by_gsis)} by ID, {len(adp_by_name)} by name")
     return adp_by_gsis, adp_by_name
+
 
 
 def update_adp(adp_by_gsis, adp_by_name):

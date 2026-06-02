@@ -13,7 +13,7 @@ SKILL_POSITIONS = {"QB", "RB", "WR", "TE"}
 # Columns we WANT — fetched defensively (missing ones become NaN, not errors)
 WANTED_COLS = [
     "player_id", "player_display_name", "position", "recent_team",
-    "season", "week", "opponent_team",
+    "season", "week", "opponent_team", "headshot_url",
     "completions", "attempts", "passing_yards", "passing_tds", "interceptions",
     "carries", "rushing_yards", "rushing_tds",
     "targets", "receptions", "receiving_yards", "receiving_tds",
@@ -139,10 +139,6 @@ def build_weekly(seasons: list) -> pd.DataFrame:
     # Keep only skill positions
     df = raw[raw["position"].isin(SKILL_POSITIONS)].copy()
 
-    # Grab headshot_url while it's here (weekly data includes it)
-    if "headshot_url" in df.columns:
-        df["_headshot_url"] = df["headshot_url"]
-
     # Grab wanted columns that actually exist; fill missing ones with NaN
     present = [c for c in WANTED_COLS if c in df.columns]
     missing = [c for c in WANTED_COLS if c not in df.columns]
@@ -199,17 +195,15 @@ def load_players(df_weekly: pd.DataFrame, seasons: list):
     """Populate the players table using data already present in weekly stats."""
     print("Building player profiles from weekly data...")
     cols = ["player_id", "player_name", "position", "team"]
-    if "_headshot_url" in df_weekly.columns:
-        cols.append("_headshot_url")
+    if "headshot_url" in df_weekly.columns:
+        cols.append("headshot_url")
 
     roster_df = (
         df_weekly.sort_values("season", ascending=False)
         .drop_duplicates("player_id")[cols]
         .copy()
     )
-    if "_headshot_url" in roster_df.columns:
-        roster_df = roster_df.rename(columns={"_headshot_url": "headshot_url"})
-    else:
+    if "headshot_url" not in roster_df.columns:
         roster_df["headshot_url"] = None
 
     roster_df["age"] = None
