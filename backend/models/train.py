@@ -31,6 +31,7 @@ FEATURES = {
         "carries_lag1", "rushing_yards_lag1", "rushing_tds_lag1",
         "fp_lag1", "fp_lag2", "fp_lag3", "fp_roll4_mean", "fp_roll4_std",
         "season_fp_mean", "season_fp_games",
+        "opp_pts_allowed_roll4", "opp_pts_allowed_season",
     ],
     "RB": [
         "season", "week", "snap_pct",
@@ -39,6 +40,7 @@ FEATURES = {
         "target_share_lag1", "target_share_roll4_mean",
         "fp_lag1", "fp_lag2", "fp_lag3", "fp_roll4_mean", "fp_roll4_std",
         "season_fp_mean", "season_fp_games",
+        "opp_pts_allowed_roll4", "opp_pts_allowed_season",
     ],
     "WR": [
         "season", "week", "snap_pct",
@@ -49,6 +51,7 @@ FEATURES = {
         "racr_lag1",
         "fp_lag1", "fp_lag2", "fp_lag3", "fp_roll4_mean", "fp_roll4_std",
         "season_fp_mean", "season_fp_games",
+        "opp_pts_allowed_roll4", "opp_pts_allowed_season",
     ],
     "TE": [
         "season", "week", "snap_pct",
@@ -58,6 +61,7 @@ FEATURES = {
         "racr_lag1",
         "fp_lag1", "fp_lag2", "fp_lag3", "fp_roll4_mean", "fp_roll4_std",
         "season_fp_mean", "season_fp_games",
+        "opp_pts_allowed_roll4", "opp_pts_allowed_season",
     ],
 }
 

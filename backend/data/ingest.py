@@ -13,7 +13,7 @@ SKILL_POSITIONS = {"QB", "RB", "WR", "TE"}
 # Columns we WANT — fetched defensively (missing ones become NaN, not errors)
 WANTED_COLS = [
     "player_id", "player_display_name", "position", "recent_team",
-    "season", "week",
+    "season", "week", "opponent_team",
     "completions", "attempts", "passing_yards", "passing_tds", "interceptions",
     "carries", "rushing_yards", "rushing_tds",
     "targets", "receptions", "receiving_yards", "receiving_tds",
@@ -57,24 +57,70 @@ def resolve_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def compute_defensive_strength(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    For each player-week, compute how many PPR points that player's opponent
+    has allowed to their position over the prior 4 weeks and season-to-date.
+    Uses a lag so there is zero data leakage.
+    """
+    print("  Computing opponent defensive strength...")
+
+    # Sum fantasy points scored against each team, by position and week
+    allowed = (
+        df.groupby(["opponent_team", "season", "week", "position"])["fantasy_points_ppr"]
+        .sum()
+        .reset_index()
+        .rename(columns={"opponent_team": "def_team", "fantasy_points_ppr": "pts_allowed"})
+    )
+
+    allowed = allowed.sort_values(["def_team", "position", "season", "week"])
+    grp = allowed.groupby(["def_team", "position"])
+
+    # Lag by 1 week so current week is never included
+    allowed["pts_allowed_lag1"] = grp["pts_allowed"].shift(1)
+
+    allowed["opp_pts_allowed_roll4"] = (
+        grp["pts_allowed_lag1"]
+        .transform(lambda x: x.rolling(4, min_periods=1).mean())
+    )
+    allowed["opp_pts_allowed_season"] = (
+        grp["pts_allowed_lag1"]
+        .transform(lambda x: x.expanding().mean())
+    )
+
+    # Join back to player rows on their opponent
+    df = df.merge(
+        allowed[["def_team", "season", "week", "position",
+                 "opp_pts_allowed_roll4", "opp_pts_allowed_season"]],
+        left_on=["opponent_team", "season", "week", "position"],
+        right_on=["def_team", "season", "week", "position"],
+        how="left",
+    )
+    df = df.drop(columns=["def_team"], errors="ignore")
+    return df
+
+
 def fetch_snap_data(seasons: list) -> pd.DataFrame:
     try:
         snaps = nfl.import_snap_counts(seasons)
-        # Find the offensive snap % column — name varies by version
+        # offense_pct is already 0-1 in some versions, 0-100 in others
         pct_col = next(
             (c for c in snaps.columns if "offense" in c.lower() and "pct" in c.lower()),
             next((c for c in snaps.columns if "snap" in c.lower() and "pct" in c.lower()), None)
         )
-        id_col = next(
-            (c for c in snaps.columns if "pfr" in c.lower() and "id" in c.lower()),
-            next((c for c in snaps.columns if "player_id" in c.lower()), None)
-        )
-        if not pct_col or not id_col:
-            print(f"  Snap count columns not found. Available: {snaps.columns.tolist()}")
+        if not pct_col:
+            print(f"  Snap pct column not found. Available: {snaps.columns.tolist()}")
             return pd.DataFrame()
-        snaps = snaps[[id_col, "season", "week", pct_col]].copy()
-        snaps.columns = ["pfr_player_id", "season", "week", "snap_pct"]
-        snaps["snap_pct"] = snaps["snap_pct"] / 100.0
+
+        snaps = snaps[["player", "team", "season", "week", pct_col]].copy()
+        snaps.columns = ["player_name_snap", "team", "season", "week", "snap_pct"]
+
+        # Normalise to 0-1 if values look like percentages
+        if snaps["snap_pct"].max() > 1.5:
+            snaps["snap_pct"] = snaps["snap_pct"] / 100.0
+
+        # Aggregate in case a player has multiple rows per week
+        snaps = snaps.groupby(["player_name_snap", "team", "season", "week"])["snap_pct"].mean().reset_index()
         return snaps
     except Exception as e:
         print(f"  Snap count fetch failed (non-fatal): {e}")
@@ -123,18 +169,26 @@ def build_weekly(seasons: list) -> pd.DataFrame:
     if "age" not in df.columns:
         df["age"] = None
 
-    # Snap counts (best effort)
+    # Snap counts — join on name + team + week
     snaps = fetch_snap_data(seasons)
     if not snaps.empty:
-        df = df.merge(snaps, left_on=["player_id", "season", "week"],
-                      right_on=["pfr_player_id", "season", "week"], how="left")
-        df = df.drop(columns=["pfr_player_id"], errors="ignore")
+        df = df.merge(
+            snaps,
+            left_on=["player_name", "team", "season", "week"],
+            right_on=["player_name_snap", "team", "season", "week"],
+            how="left"
+        )
+        df = df.drop(columns=["player_name_snap"], errors="ignore")
+        matched = df["snap_pct"].notna().sum()
+        print(f"  Snap counts matched: {matched:,} rows")
     else:
         df["snap_pct"] = None
 
     for col in FLOAT_COLS:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = compute_defensive_strength(df)
 
     df = df.drop_duplicates(subset=["player_id", "season", "week"])
     print(f"  -> {len(df):,} rows across {df['player_id'].nunique():,} players")

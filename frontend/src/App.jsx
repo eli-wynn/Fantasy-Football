@@ -37,6 +37,7 @@ function App() {
           <th>Position</th>
           <th>Team</th>
           <th>Projected PPR</th>
+          <th>Player ADP</th>
         </tr>
       </thead>
       <tbody>
@@ -46,6 +47,9 @@ function App() {
             <td>{player.position}</td>
             <td>{player.team}</td>
             <td>{player.projected_pts_ppr?.toFixed(2)}</td>
+            <td style={{color: player.adp_value_ppr > 0 ? 'green' : player.adp_value_ppr < 0 ? 'red' : 'inherit'}}>
+              {player.adp_value_ppr?.toFixed(1) ?? '-'}
+            </td>
           </tr>
         ))}
       </tbody>

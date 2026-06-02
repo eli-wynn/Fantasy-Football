@@ -63,6 +63,10 @@ weekly_stats = Table(
     Column("fantasy_points_ppr", Float),
     Column("fantasy_points_std", Float),
     Column("snap_pct", Float),
+    # Opponent defensive strength
+    Column("opponent_team", String),
+    Column("opp_pts_allowed_roll4", Float),   # 4-week rolling avg pts allowed to this position
+    Column("opp_pts_allowed_season", Float),  # season-to-date avg pts allowed to this position
 )
 
 projections = Table(
