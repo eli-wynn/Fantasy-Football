@@ -100,6 +100,41 @@ def compute_defensive_strength(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def fetch_vegas_lines(seasons: list) -> pd.DataFrame:
+    """
+    Pull game lines from nfl_data_py schedules and calculate implied team totals.
+
+    For each game we have:
+      spread_line  — positive = away team is underdog (home team favoured)
+      total_line   — combined points both teams expected to score
+
+    Implied team total formula:
+      home implied = (total / 2) + (spread / 2)
+      away implied = (total / 2) - (spread / 2)
+    """
+    try:
+        sched = nfl.import_schedules(seasons)
+        sched = sched[sched['total_line'].notna() & sched['spread_line'].notna()].copy()
+
+        # Calculate implied totals for both teams
+        sched['home_implied'] = (sched['total_line'] / 2) + (sched['spread_line'] / 2)
+        sched['away_implied'] = (sched['total_line'] / 2) - (sched['spread_line'] / 2)
+
+        # Build two rows per game — one for each team
+        home = sched[['season', 'week', 'home_team', 'home_implied', 'total_line', 'temp', 'wind']].copy()
+        home.columns = ['season', 'week', 'team', 'implied_team_total', 'game_total', 'temp', 'wind']
+
+        away = sched[['season', 'week', 'away_team', 'away_implied', 'total_line', 'temp', 'wind']].copy()
+        away.columns = ['season', 'week', 'team', 'implied_team_total', 'game_total', 'temp', 'wind']
+
+        lines = pd.concat([home, away], ignore_index=True)
+        print(f"  Vegas lines loaded: {len(lines)} team-game rows")
+        return lines
+    except Exception as e:
+        print(f"  Vegas lines fetch failed (non-fatal): {e}")
+        return pd.DataFrame()
+
+
 def fetch_snap_data(seasons: list) -> pd.DataFrame:
     try:
         snaps = nfl.import_snap_counts(seasons)
@@ -183,6 +218,18 @@ def build_weekly(seasons: list) -> pd.DataFrame:
     for col in FLOAT_COLS:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Vegas lines join — team + season + week
+    lines = fetch_vegas_lines(seasons)
+    if not lines.empty:
+        df = df.merge(lines, on=["team", "season", "week"], how="left")
+        matched = df["implied_team_total"].notna().sum()
+        print(f"  Vegas lines matched: {matched:,} rows")
+    else:
+        df["implied_team_total"] = None
+        df["game_total"] = None
+        df["temp"] = None
+        df["wind"] = None
 
     df = compute_defensive_strength(df)
 

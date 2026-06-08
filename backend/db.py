@@ -67,6 +67,11 @@ weekly_stats = Table(
     Column("opponent_team", String),
     Column("opp_pts_allowed_roll4", Float),   # 4-week rolling avg pts allowed to this position
     Column("opp_pts_allowed_season", Float),  # season-to-date avg pts allowed to this position
+    # Vegas lines
+    Column("implied_team_total", Float),      # how many points Vegas expects this team to score
+    Column("game_total", Float),              # combined over/under for the game
+    Column("temp", Float),                    # game temperature (fahrenheit)
+    Column("wind", Float),                    # wind speed (mph)
 )
 
 projections = Table(

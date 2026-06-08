@@ -1,8 +1,10 @@
-from backend.db import engine
-from sqlalchemy import text
 import nfl_data_py as nfl
 
-# Check what nfl_data_py weekly data has for headshots
-df = nfl.import_weekly_data([2024])
-sample = df[df['player_display_name'].str.contains('Mahomes', na=False)][['player_id', 'player_display_name', 'headshot_url']].head(3)
-print(sample)
+sched = nfl.import_schedules([2024])
+
+# Look at a few rows with the relevant columns
+cols = ['season', 'week', 'away_team', 'home_team', 'spread_line', 'total_line', 'temp', 'wind']
+sample = sched[cols].dropna(subset=['spread_line', 'total_line']).head(5)
+print(sample.to_string())
+print(f"\nTotal games: {len(sched)}")
+print(f"Games with lines: {sched['total_line'].notna().sum()}")
