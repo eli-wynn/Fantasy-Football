@@ -8,6 +8,20 @@ function App() {
   const [search, setSearch] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [hoveredPlayer, setHoveredPlayer] = useState(null)
+  const [sortCol, setSortCol] = useState('projected_pts_ppr')
+  const [sortDir, setSortDir] = useState('desc')
+
+  const handleSort = (col) => {
+    if (sortCol === col) {
+      setSortDir(sortDir === 'desc' ? 'asc' : 'desc')
+    } else {
+      setSortCol(col)
+      // ADP sorts ascending by default (1 = best)
+      setSortDir(col === 'adp' ? 'asc' : 'desc')
+    }
+  }
+
+  const sortArrow = (col) => sortCol === col ? (sortDir === 'desc' ? ' ↓' : ' ↑') : ''
 
   useEffect(() => {
     fetch('http://localhost:8000/projections')
@@ -29,6 +43,25 @@ function App() {
   const filteredPlayers = rankedPlayers
     .filter(p => position === 'ALL' || p.position === position)
     .filter(p => p.player_name.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => {
+      const aVal = a[sortCol]
+      const bVal = b[sortCol]
+
+      // Nulls always go to the bottom regardless of sort direction
+      if (aVal == null && bVal == null) return 0
+      if (aVal == null) return 1
+      if (bVal == null) return -1
+
+      return sortDir === 'desc' ? bVal - aVal : aVal - bVal
+    })
+
+
+  const positionColors = {
+    QB: 'bg-rose-500',
+    RB: 'bg-emerald-500',
+    WR: 'bg-sky-500',
+    TE: 'bg-amber-500',
+  }
 
   return (
     <div className="flex bg-gray-800 min-h-screen">
@@ -94,8 +127,9 @@ function App() {
                   <th className="px-4 py-3 hidden sm:table-cell">Position</th>
                   <th className="px-4 py-3 hidden sm:table-cell">Age</th>
                   <th className="px-4 py-3 hidden sm:table-cell">Team</th>
-                  <th className="px-4 py-3">Proj PPR</th>
-                  <th className="px-4 py-3 hidden md:table-cell">Sleeper ADP</th>
+                  <th className="px-4 py-3 cursor-pointer hover:text-white select-none" onClick={() => handleSort('projected_pts_ppr')}>Proj PPR{sortArrow('projected_pts_ppr')}</th>
+                  <th className="px-4 py-3 hidden md:table-cell cursor-pointer hover:text-white select-none" onClick={() => handleSort('ppg_last_season')}>PPG Last Year{sortArrow('ppg_last_season')}</th>
+                  <th className="px-4 py-3 hidden md:table-cell cursor-pointer hover:text-white select-none" onClick={() => handleSort('adp')}>Sleeper ADP{sortArrow('adp')}</th>
                   <th className="px-4 py-3 hidden md:table-cell">ADP Change</th>
                 </tr>
               </thead>
@@ -109,11 +143,16 @@ function App() {
                   >
                     <td className="px-4 py-3 text-gray-400">{player.rank}</td>
                     <td className="px-4 py-3 font-medium text-white">{player.player_name}</td>
-                    <td className="px-4 py-3 hidden sm:table-cell">{player.position}</td>
+                    <td className="px-4 py-3 hidden sm:table-cell">
+                      <span className={`${positionColors[player.position]} rounded-full px-2 py-0.5 text-xs font-bold text-white`}>
+                        {player.position}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 hidden sm:table-cell">{player.age}</td>
                     <td className="px-4 py-3 hidden sm:table-cell">{player.team}</td>
                     <td className="px-4 py-3">{player.projected_pts_ppr?.toFixed(2)}</td>
-                    <td className="px-4 py-3 hidden md:table-cell">{player.adp?.toFixed(0) ?? '-'}</td>
+                    <td className="px-4 py-3 hidden md:table-cell">{player.ppg_last_season ?? '-'}</td>
+                    <td className="px-4 py-3 hidden md:table-cell">{player.adp && player.adp < 999 ? player.adp.toFixed(0) : '-'}</td>
                     <td
                       className="px-4 py-3 hidden md:table-cell"
                       style={{ color: player.adp_value_ppr > 0 ? '#4ade80' : player.adp_value_ppr < 0 ? '#f87171' : 'inherit' }}
@@ -152,7 +191,7 @@ function App() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Sleeper ADP</span>
-                  <span className="text-white font-medium">{hoveredPlayer.adp?.toFixed(0) ?? '-'}</span>
+                  <span className="text-white font-medium">{hoveredPlayer.adp && hoveredPlayer.adp < 999 ? hoveredPlayer.adp.toFixed(0) : '-'}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">ADP Value</span>

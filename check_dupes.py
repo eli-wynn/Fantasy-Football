@@ -1,10 +1,16 @@
-import nfl_data_py as nfl
+from backend.db import engine
+from sqlalchemy import text
 
-sched = nfl.import_schedules([2024])
-
-# Look at a few rows with the relevant columns
-cols = ['season', 'week', 'away_team', 'home_team', 'spread_line', 'total_line', 'temp', 'wind']
-sample = sched[cols].dropna(subset=['spread_line', 'total_line']).head(5)
-print(sample.to_string())
-print(f"\nTotal games: {len(sched)}")
-print(f"Games with lines: {sched['total_line'].notna().sum()}")
+with engine.connect() as conn:
+    rows = conn.execute(text("""
+        SELECT adp, COUNT(*) as cnt
+        FROM projections
+        WHERE adp IS NOT NULL
+        GROUP BY adp
+        HAVING COUNT(*) > 1
+        ORDER BY cnt DESC
+        LIMIT 15
+    """)).fetchall()
+    print("ADP values with duplicates:")
+    for r in rows:
+        print(f"  ADP {r[0]}: {r[1]} players")
