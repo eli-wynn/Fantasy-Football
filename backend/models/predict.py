@@ -74,8 +74,9 @@ def summarise_season(df: pd.DataFrame, season: int) -> pd.DataFrame:
     # Players with fewer games get pulled toward position mean later
     agg["sample_confidence"] = np.minimum(agg["games_played"] / FULL_SEASON_GAMES, 1.0)
 
-    # Flag injury seasons (missed 6+ games)
-    agg["injury_season"] = (agg["games_played"] < (FULL_SEASON_GAMES - 6)).astype(int)
+    # Flag injury seasons — only penalise very small samples (< 5 games)
+    # PPG is already per-game normalised so mid-season injuries don't distort the mean
+    agg["injury_season"] = (agg["games_played"] < 5).astype(int)
 
     return agg
 
@@ -92,8 +93,8 @@ def build_weighted_summary(season_data: dict[int, pd.DataFrame], base_season: in
         s = summarise_season(season_data[season], season)
         base_weight = SEASON_WEIGHTS.get(i, 0.05)
 
-        # Down-weight injury seasons — pull toward prior seasons more
-        s["weight"] = base_weight * np.where(s["injury_season"] == 1, 0.4, 1.0)
+        # Down-weight only genuinely tiny samples (< 5 games)
+        s["weight"] = base_weight * np.where(s["injury_season"] == 1, 0.8, 1.0)
         summaries.append(s)
 
     # Combine all seasons

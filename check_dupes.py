@@ -1,16 +1,8 @@
-from backend.db import engine
-from sqlalchemy import text
+import nfl_data_py as nfl
 
-with engine.connect() as conn:
-    rows = conn.execute(text("""
-        SELECT adp, COUNT(*) as cnt
-        FROM projections
-        WHERE adp IS NOT NULL
-        GROUP BY adp
-        HAVING COUNT(*) > 1
-        ORDER BY cnt DESC
-        LIMIT 15
-    """)).fetchall()
-    print("ADP values with duplicates:")
-    for r in rows:
-        print(f"  ADP {r[0]}: {r[1]} players")
+try:
+    rosters = nfl.import_seasonal_rosters([2025])
+    print(f"Success! Rows: {len(rosters)}")
+    print(rosters[rosters['position'].isin(['QB','RB','WR','TE'])].head(3).to_string())
+except Exception as e:
+    print(f"Failed: {e}")

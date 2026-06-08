@@ -106,6 +106,7 @@ def get_projections(
             AND ws.season = :season - 1
             AND ws.fantasy_points_ppr > 0
         WHERE p.season = :season
+        AND (p.adp IS NOT NULL AND p.adp < 500)
         {"AND p.position = :pos" if position else ""}
         GROUP BY p.player_id, p.player_name, p.position, p.team, p.season,
                  p.projected_pts_ppr, p.projected_pts_std, p.projected_pts_half,

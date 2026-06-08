@@ -15,10 +15,12 @@ from backend.db import engine
 SKILL_POSITIONS = {"QB", "RB", "WR", "TE"}
 
 DEPTH_PENALTY = {
-    "QB": {1: 1.0, 2: 0.15, 3: 0.05},
-    "RB": {1: 1.0, 2: 0.45, 3: 0.15},
-    "WR": {1: 1.0, 2: 0.40, 3: 0.15},
-    "TE": {1: 1.0, 2: 0.35, 3: 0.15},
+    "QB": {1: 1.0, 2: 0.12, 3: 0.04},
+    "RB": {1: 1.0, 2: 0.40, 3: 0.12},
+    # WR and TE depth chart is unreliable for fantasy — slot WRs show as WR2
+    # physically but are fantasy WR1s. Use no-ADP cap in blend_adp instead.
+    "WR": {1: 1.0, 2: 1.0, 3: 1.0},
+    "TE": {1: 1.0, 2: 1.0, 3: 1.0},
 }
 
 
@@ -27,9 +29,17 @@ def normalise(name: str) -> str:
 
 
 def fetch_nfl_rosters(season: int = 2025) -> dict:
-    """Get end-of-season team assignments from nfl_data_py."""
+    """Get end-of-season team assignments from nfl_data_py.
+    Falls back to previous season if the requested season is unavailable."""
     print(f"Fetching {season} seasonal rosters from nfl_data_py...")
-    rosters = nfl.import_seasonal_rosters([season])
+    try:
+        rosters = nfl.import_seasonal_rosters([season])
+        if rosters.empty:
+            raise ValueError("Empty roster data")
+    except Exception as e:
+        fallback = season - 1
+        print(f"  {season} rosters unavailable ({e}), falling back to {fallback}...")
+        rosters = nfl.import_seasonal_rosters([fallback])
 
     # Keep only skill positions, last week available per player
     rosters = rosters[rosters["position"].isin(SKILL_POSITIONS)].copy()

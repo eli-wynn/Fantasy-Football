@@ -7,7 +7,7 @@ from sqlalchemy import text
 from backend.db import engine
 
 # How much weight to give ADP vs model (0.0 = pure model, 1.0 = pure ADP)
-ADP_BLEND_WEIGHT = 0.35
+ADP_BLEND_WEIGHT = 0.50
 
 
 def blend():
@@ -48,6 +48,42 @@ def blend():
                     WHERE player_id = :pid
                 """), {"pts": round(blended_pts, 4), "pid": player_id})
                 blended += 1
+
+        # --- Position scaling: nudge positions that tend to be under/over projected ---
+        # Tune these multipliers based on backtest results and visual inspection
+        position_scale = {
+            "RB": 1.12,
+            "WR": 1.10,
+            "TE": 1.08,
+            "QB": 1.00,
+        }
+        for pos, scale in position_scale.items():
+            conn.execute(text("""
+                UPDATE projections
+                SET projected_pts_ppr  = projected_pts_ppr  * :s,
+                    projected_pts_std  = projected_pts_std  * :s,
+                    projected_pts_half = projected_pts_half * :s,
+                    confidence_low     = confidence_low     * :s,
+                    confidence_high    = confidence_high    * :s
+                WHERE position = :pos
+            """), {"s": scale, "pos": pos})
+
+        # --- No-ADP cap: players Sleeper doesn't rank are capped at replacement level ---
+        # Runs here so ADP is already populated by fetch_adp
+        no_adp_caps = {"QB": 8.0, "RB": 6.0, "WR": 5.0, "TE": 4.5}
+        capped = 0
+        for pos, cap in no_adp_caps.items():
+            result = conn.execute(text("""
+                UPDATE projections
+                SET projected_pts_ppr  = LEAST(projected_pts_ppr,  :cap),
+                    projected_pts_std  = LEAST(projected_pts_std,  :cap),
+                    projected_pts_half = LEAST(projected_pts_half, :cap)
+                WHERE position = :pos
+                AND (adp IS NULL OR adp >= 999)
+                AND projected_pts_ppr > :cap
+            """), {"cap": cap, "pos": pos})
+            capped += result.rowcount
+        print(f"Capped {capped} unranked players at replacement level")
 
         conn.execute(text("""
             UPDATE projections p1
